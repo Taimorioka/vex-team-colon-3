@@ -1,9 +1,15 @@
 #![no_main]
 #![no_std]
 
+use core::time::Duration;
+
 use vexide::prelude::*;
 
-struct Robot {}
+struct Robot {
+    controller: Controller,
+    motor_left: Motor,
+    motor_right: Motor,
+}
 
 impl Compete for Robot {
     async fn autonomous(&mut self) {
@@ -12,13 +18,30 @@ impl Compete for Robot {
 
     async fn driver(&mut self) {
         println!("Driver!");
+        
+        loop {
+            let forward = self.controller.left_stick.y().unwrap_or_default() as f64;
+            let turn = self.controller.right_stick.x().unwrap_or_default() as f64;
+            let left_voltage = (forward + turn) * Motor::MAX_VOLTAGE;
+            let right_voltage = (forward - turn) * Motor::MAX_VOLTAGE;
+
+            // Set the drive motors to our arcade control values.
+            self.motor_left.set_voltage(left_voltage).ok();
+            self.motor_right.set_voltage(right_voltage).ok();
+
+
+            sleep(Duration::from_millis(10)).await;
+        }
     }
 }
 
 #[vexide::main]
 async fn main(peripherals: Peripherals) {
-    println!("Hello world");
-    let robot = Robot {};
-
+    let robot = Robot {
+        controller: peripherals.primary_controller,
+        motor_left: Motor::new(peripherals.port_1, Gearset::Green, Direction::Forward),
+        motor_right: Motor::new(peripherals.port_2, Gearset::Green, Direction::Forward),
+    };
+    
     robot.compete().await;
 }

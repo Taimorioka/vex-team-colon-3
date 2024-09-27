@@ -46,6 +46,12 @@ async fn main(peripherals: Peripherals) {
         controller: peripherals.primary_controller,
         motor_left: Motor::new(peripherals.port_1, Gearset::Green, Direction::Forward),
         motor_right: Motor::new(peripherals.port_2, Gearset::Green, Direction::Forward),
+        //intake
+        //intake extender
+        //arm head
+        //arm base
+        //arm extender
+        //climb
     };
     
     robot.compete().await;

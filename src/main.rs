@@ -1,9 +1,13 @@
 #![no_main]
 #![no_std]
 
+extern crate alloc;
+
 use core::time::Duration;
 
 use vexide::prelude::*;
+
+mod subsystems;
 
 struct Robot {
     controller: Controller,

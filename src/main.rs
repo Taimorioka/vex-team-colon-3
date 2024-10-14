@@ -5,12 +5,14 @@ extern crate alloc;
 
 use core::time::Duration;
 
+use alloc::rc::Rc;
+use subsystems::RefreshableController;
 use vexide::prelude::*;
 
 mod subsystems;
 
 struct Robot {
-    controller: Controller,
+    controller: Rc<RefreshableController>,
     motor_left: Motor,
     motor_right: Motor,
 }
@@ -24,11 +26,14 @@ impl Compete for Robot {
         println!("Driver!");
         
         loop {
-            let forward = self.controller.left_stick.y().unwrap_or_default() as f64;
-            let turn = self.controller.right_stick.x().unwrap_or_default() as f64;
+            self.controller.refresh_or_default();
+            let state = self.controller.state().unwrap_or_default();
+            let forward = state.left_stick.y();
+            let turn = state.right_stick.x();
+
             if forward.abs() > 0.05 || turn.abs() > 0.05 {
-                let left_voltage = (turn + forward) * Motor::MAX_VOLTAGE;
-                let right_voltage = (turn - forward) * Motor::MAX_VOLTAGE;
+                let left_voltage = (turn + forward) * Motor::V5_MAX_VOLTAGE;
+                let right_voltage = (turn - forward) * Motor::V5_MAX_VOLTAGE;
     
                 // Set the drive motors to our arcade control values.
                 self.motor_left.set_voltage(left_voltage).ok();
@@ -47,7 +52,7 @@ impl Compete for Robot {
 #[vexide::main]
 async fn main(peripherals: Peripherals) {
     let robot = Robot {
-        controller: peripherals.primary_controller,
+        controller: RefreshableController::shared(peripherals.primary_controller),
         motor_left: Motor::new(peripherals.port_1, Gearset::Green, Direction::Forward),
         motor_right: Motor::new(peripherals.port_2, Gearset::Green, Direction::Forward),
         //intake

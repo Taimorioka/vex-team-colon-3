@@ -1,7 +1,7 @@
-use core::{cell::{RefCell, RefMut}, future::Future, ops::Deref};
-use alloc::rc::Rc;
+use core::{cell::{Cell, RefCell, RefMut}, future::Future, ops::Deref};
+use alloc::{rc::Rc, sync::Arc};
 use snafu::Snafu;
-use vexide::prelude::{spawn, Task};
+use vexide::{devices::controller::ControllerState, prelude::*};
 
 mod drivetrain;
 
@@ -23,5 +23,29 @@ impl<T> Subsystem<T> {
 
     fn stop_command(&mut self) {
         self.task = None;
+    }
+}
+
+type SharedController = Rc<RefreshableController>;
+
+pub struct RefreshableController {
+    state: RefCell<ControllerState>,
+    inner: Controller,
+}
+
+impl RefreshableController {
+    pub fn shared(inner: Controller) -> SharedController {
+        Rc::new(Self {
+                    state: RefCell::new(inner.state().unwrap_or_default()),
+                    inner,
+                })
+    }
+
+    pub fn refresh_or_default(&self) {
+        *self.state.borrow_mut() = self.inner.state().unwrap_or_default();
+    }
+
+    pub fn state(&self) -> ControllerState {
+        *self.state.borrow()
     }
 }

@@ -13,15 +13,14 @@ pub struct DifferentialDrivetrain {
 impl DifferentialDrivetrain {
     const DEADZONE: f64 = 0.05;
 
-    pub async fn drive_with_controller(&mut self, arcade_drive: Joystick, arcade_turn: Joystick) -> Task<()> {
+    pub async fn drive_with_controller(&mut self, controller: Rc<>) -> Task<()> {
         spawn(async move {
             loop {
                 let drive = arcade_drive.y().unwrap_or_default();
                 let turn = arcade_turn.x().unwrap_or_default();
-                let io = 
                 if drive >= Self::DEADZONE || turn >= Self::DEADZONE {
-                    let drive_volts = drive * Motor::MAX_VOLTAGE;
-                    let turn_volts = turn * Motor::MAX_VOLTAGE;
+                    let drive_volts = drive * Motor::V5_MAX_VOLTAGE;
+                    let turn_volts = turn * Motor::V5_MAX_VOLTAGE;
                 }
                 sleep(Controller::UPDATE_INTERVAL).await;
             }

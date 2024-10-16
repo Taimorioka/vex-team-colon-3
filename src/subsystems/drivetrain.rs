@@ -1,9 +1,14 @@
-use core::cell::RefCell;
+use core::{cell::RefCell, future::Future};
 
-use alloc::rc::Rc;
+use alloc::{boxed::Box, rc::Rc};
 use vexide::{devices::controller::Joystick, prelude::*};
 
 use super::Subsystem;
+
+trait Command {
+    fn run(&self) -> impl Future<Output = ()> + Send + Sync;
+    fn end(&self);
+}
 
 #[derive(Debug)]
 pub struct DifferentialDrivetrain {

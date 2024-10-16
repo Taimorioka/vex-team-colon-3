@@ -3,12 +3,22 @@ use core::{cell::RefCell, future::Future};
 use alloc::{boxed::Box, rc::Rc};
 use vexide::{devices::controller::Joystick, prelude::*};
 
-use super::Subsystem;
+use super::{SharedController, Subsystem};
 
 trait Command {
     fn run(&self) -> impl Future<Output = ()> + Send + Sync;
     fn end(&self);
 }
+
+struct DriveWithControllerData {
+    controller: SharedController,
+}
+
+struct DriveWithController {
+    data: Rc<RefCell<DriveWithControllerData>>,
+}
+
+impl Command for DriveWithController {}
 
 #[derive(Debug)]
 pub struct DifferentialDrivetrain {

@@ -1,45 +1,70 @@
-use core::{cell::RefCell, future::Future};
+use core::{cell::RefCell, future::Future, time::Duration};
 
 use alloc::{boxed::Box, rc::Rc};
-use vexide::{devices::controller::Joystick, prelude::*};
+use vexide::{prelude::*};
 
 use super::{SharedController, Subsystem};
 
 trait Command {
-    fn run(&self) -> impl Future<Output = ()> + Send + Sync;
+    fn run(&self) -> impl Future<Output = ()>;
     fn end(&self);
 }
 
-struct DriveWithControllerData {
-    controller: SharedController,
-}
-
+#[derive(Clone)]
 struct DriveWithController {
-    data: Rc<RefCell<DriveWithControllerData>>,
+    controller: SharedController,
+    io: Rc<RefCell<DifferentialDrivetrainIO>>,
 }
 
-impl Command for DriveWithController {}
+impl Command for DriveWithController {
+    async fn run(&self) {
+        DifferentialDrivetrain::drive_with_controller_run_impl(&self.controller, &self.io).await;
+    }
+
+    fn end(&self) {
+        
+    }
+}
+
+impl DifferentialDrivetrain {
+    async fn drive_with_controller_run_impl(controller: &SharedController, io: &Rc<RefCell<DifferentialDrivetrainIO>>) {
+        let mut io = io.borrow_mut();
+        loop {
+            let state = controller.state();
+            let forward = state.left_stick.y();
+            let turn = state.right_stick.x();
+
+            if forward >= Self::DEADZONE || turn >= Self::DEADZONE {
+                if forward.abs() > 0.05 || turn.abs() > 0.05 {
+                    let left_voltage = (turn + forward) * Motor::V5_MAX_VOLTAGE;
+                    let right_voltage = (turn - forward) * Motor::V5_MAX_VOLTAGE;
+        
+                    // Set the drive motors to our arcade control values.
+                    io.left.set_voltage(left_voltage).ok();
+                    io.right.set_voltage(right_voltage).ok();
+                } else {
+                    io.left.brake(BrakeMode::Brake).ok();
+                    io.right.brake(BrakeMode::Brake).ok();
+                }
+            }
+            sleep(Controller::UPDATE_INTERVAL).await;
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct DifferentialDrivetrain {
-    subsystem: Subsystem<DifferentialDrivetrainIO>,
+    io: Rc<RefCell<DifferentialDrivetrainIO>>,
 }
 
 impl DifferentialDrivetrain {
     const DEADZONE: f64 = 0.05;
 
-    pub async fn drive_with_controller(&mut self, controller: Rc<>) -> Task<()> {
-        spawn(async move {
-            loop {
-                let drive = arcade_drive.y().unwrap_or_default();
-                let turn = arcade_turn.x().unwrap_or_default();
-                if drive >= Self::DEADZONE || turn >= Self::DEADZONE {
-                    let drive_volts = drive * Motor::V5_MAX_VOLTAGE;
-                    let turn_volts = turn * Motor::V5_MAX_VOLTAGE;
-                }
-                sleep(Controller::UPDATE_INTERVAL).await;
-            }
-        })
+    pub async fn drive_with_controller(self: Rc<Self>, controller: SharedController) -> impl Command {
+        DriveWithController {
+            controller,
+            io: self.io.clone()
+        }
     }
 }
 

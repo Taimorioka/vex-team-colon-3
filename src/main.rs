@@ -27,7 +27,7 @@ impl Compete for Robot {
         
         loop {
             self.controller.refresh_or_default();
-            let state = self.controller.state().unwrap_or_default();
+            let state = self.controller.state();
             let forward = state.left_stick.y();
             let turn = state.right_stick.x();
 

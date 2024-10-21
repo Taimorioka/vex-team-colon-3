@@ -1,14 +1,9 @@
+use alloc::{boxed::Box, rc::Rc};
 use core::{cell::RefCell, future::Future, time::Duration};
 
-use alloc::{boxed::Box, rc::Rc};
-use vexide::{prelude::*};
+use vexide::prelude::*;
 
-use super::{SharedController, Subsystem};
-
-trait Command {
-    fn run(&self) -> impl Future<Output = ()>;
-    fn end(&self);
-}
+use super::{Command, SharedController};
 
 #[derive(Clone)]
 struct DriveWithController {
@@ -22,23 +17,25 @@ impl Command for DriveWithController {
     }
 
     fn end(&self) {
-        
+        DifferentialDrivetrain::drive_with_controller_end_impl(&self.controller, &self.io);
     }
 }
 
 impl DifferentialDrivetrain {
-    async fn drive_with_controller_run_impl(controller: &SharedController, io: &Rc<RefCell<DifferentialDrivetrainIO>>) {
+    async fn drive_with_controller_run_impl(
+        controller: &SharedController,
+        io: &Rc<RefCell<DifferentialDrivetrainIO>>,
+    ) {
         let mut io = io.borrow_mut();
         loop {
             let state = controller.state();
-            let forward = state.left_stick.y();
-            let turn = state.right_stick.x();
+            let forward = -state.left_stick.y();
+            let turn = state.right_stick.x() - Self::DRIFT_CORRECTION;
 
-            if forward >= Self::DEADZONE || turn >= Self::DEADZONE {
-                if forward.abs() > 0.05 || turn.abs() > 0.05 {
+            if forward.abs() >= Self::DEADZONE || turn.abs() >= Self::DEADZONE {
                     let left_voltage = (turn + forward) * Motor::V5_MAX_VOLTAGE;
                     let right_voltage = (turn - forward) * Motor::V5_MAX_VOLTAGE;
-        
+
                     // Set the drive motors to our arcade control values.
                     io.left.set_voltage(left_voltage).ok();
                     io.right.set_voltage(right_voltage).ok();
@@ -46,9 +43,16 @@ impl DifferentialDrivetrain {
                     io.left.brake(BrakeMode::Brake).ok();
                     io.right.brake(BrakeMode::Brake).ok();
                 }
-            }
             sleep(Controller::UPDATE_INTERVAL).await;
         }
+    }
+
+    fn drive_with_controller_end_impl(
+        controller: &SharedController,
+        io: &Rc<RefCell<DifferentialDrivetrainIO>>,
+    ) {
+        let mut io = io.borrow_mut();
+        _ = io;
     }
 }
 
@@ -59,11 +63,18 @@ pub struct DifferentialDrivetrain {
 
 impl DifferentialDrivetrain {
     const DEADZONE: f64 = 0.05;
+    const DRIFT_CORRECTION: f64 = 0.01;
 
-    pub async fn drive_with_controller(self: Rc<Self>, controller: SharedController) -> impl Command {
+    pub fn new(left: Motor, right: Motor) -> Self {
+        Self {
+            io: DifferentialDrivetrainIO::new(left, right),
+        }
+    }
+
+    pub fn drive_with_controller(&self, controller: SharedController) -> impl Command {
         DriveWithController {
             controller,
-            io: self.io.clone()
+            io: self.io.clone(),
         }
     }
 }
@@ -71,13 +82,13 @@ impl DifferentialDrivetrain {
 #[derive(Debug)]
 struct DifferentialDrivetrainIO {
     left: Motor,
-    right: Motor
+    right: Motor,
 }
 
 impl DifferentialDrivetrainIO {
-    pub fn new(mut left: Motor, mut right: Motor) -> Self {
+    pub fn new(mut left: Motor, mut right: Motor) -> Rc<RefCell<Self>> {
         _ = left.brake(BrakeMode::Brake);
         _ = right.brake(BrakeMode::Brake);
-        Self { left, right }
+        Rc::new(RefCell::new(Self { left, right }))
     }
 }

@@ -3,18 +3,20 @@
 
 extern crate alloc;
 
+use alloc::rc::Rc;
 use core::time::Duration;
 
-use alloc::rc::Rc;
-use subsystems::RefreshableController;
+use subsystems::{
+    drivetrain::DifferentialDrivetrain, intake::Intake, Command, RefreshableController, SharedController
+};
 use vexide::prelude::*;
 
 mod subsystems;
 
 struct Robot {
-    controller: Rc<RefreshableController>,
-    motor_left: Motor,
-    motor_right: Motor,
+    controller: SharedController,
+    drivetrain: DifferentialDrivetrain,
+    intake: Intake,
 }
 
 impl Compete for Robot {
@@ -24,28 +26,29 @@ impl Compete for Robot {
 
     async fn driver(&mut self) {
         println!("Driver!");
-        
+
+        let cmd = self
+            .drivetrain
+            .drive_with_controller(self.controller.clone())
+            .schedule();
+
+        let mut intake_cmd = None;
+
         loop {
             self.controller.refresh_or_default();
             let state = self.controller.state();
-            let forward = state.left_stick.y();
-            let turn = state.right_stick.x();
 
-            if forward.abs() > 0.05 || turn.abs() > 0.05 {
-                let left_voltage = (turn + forward) * Motor::V5_MAX_VOLTAGE;
-                let right_voltage = (turn - forward) * Motor::V5_MAX_VOLTAGE;
-    
-                // Set the drive motors to our arcade control values.
-                self.motor_left.set_voltage(left_voltage).ok();
-                self.motor_right.set_voltage(right_voltage).ok();
-            } else {
-                self.motor_left.brake(BrakeMode::Brake).ok();
-                self.motor_right.brake(BrakeMode::Brake).ok();
+            if state.right_trigger_1.is_now_pressed() {
+                intake_cmd = Some(self.intake.intake().schedule());
             }
 
+            if state.right_trigger_1.is_now_released() {
+                intake_cmd = None;
+            }
 
             sleep(Duration::from_millis(10)).await;
         }
+        drop(cmd);
     }
 }
 
@@ -53,15 +56,17 @@ impl Compete for Robot {
 async fn main(peripherals: Peripherals) {
     let robot = Robot {
         controller: RefreshableController::shared(peripherals.primary_controller),
-        motor_left: Motor::new(peripherals.port_1, Gearset::Green, Direction::Forward),
-        motor_right: Motor::new(peripherals.port_2, Gearset::Green, Direction::Forward),
-        //intake
-        //intake extender
-        //arm head
-        //arm base
-        //arm extender
-        //climb
+        drivetrain: DifferentialDrivetrain::new(
+            Motor::new(peripherals.port_1, Gearset::Green, Direction::Forward),
+            Motor::new(peripherals.port_2, Gearset::Green, Direction::Forward),
+        ), //intake
+        intake: Intake::new(Motor::new(peripherals.port_3, Gearset::Green, Direction::Forward)),
+           //intake extender
+           //arm head
+           //arm base
+           //arm extender
+           //climb
     };
-    
+
     robot.compete().await;
 }

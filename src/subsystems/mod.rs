@@ -1,86 +1,68 @@
-use alloc::{rc::Rc, sync::Arc};
+use alloc::{boxed::Box, rc::Rc, sync::Arc};
 use core::{
     cell::{Cell, RefCell, RefMut},
     future::Future,
     ops::Deref,
+    pin::{pin, Pin},
 };
 
 use snafu::Snafu;
-use vexide::{devices::controller::ControllerState, prelude::*};
+use vexide::{
+    devices::controller::{ButtonState, ControllerState},
+    prelude::*,
+};
 
 pub mod drivetrain;
 pub mod intake;
 
-pub type SharedController = Rc<RefreshableController>;
-
-pub struct RefreshableController {
-    state: RefCell<ControllerState>,
-    inner: Controller,
+pub struct Subsystem<T> {
+    data: Rc<RefCell<T>>,
+    idle_goal: Goal<T>,
+    current_goal: Option<Task<()>>,
 }
 
-impl RefreshableController {
-    pub fn shared(inner: Controller) -> SharedController {
-        Rc::new(Self {
-            state: RefCell::new(inner.state().unwrap_or_default()),
-            inner,
-        })
-    }
-
-    pub fn refresh_or_default(&self) {
-        *self.state.borrow_mut() = self.inner.state().unwrap_or_default();
-        // println!("Controller: {:?}", self.state());
-    }
-
-    pub fn state(&self) -> ControllerState {
-        *self.state.borrow()
-    }
-}
-
-pub trait Command: 'static {
-    fn run(&self) -> impl Future<Output = ()>
-    where
-        Self: Sized;
-    fn end(&self);
-
-    fn schedule(self) -> ScheduledCommand
-    where
-        Self: Sized,
-    {
-        ScheduledCommand::start(self)
-    }
-}
-
-#[must_use = "the command is cancelled when the struct is dropped"]
-pub struct ScheduledCommand {
-    command: Rc<dyn Command>,
-    task: Option<Task<()>>,
-}
-
-impl ScheduledCommand {
-    pub fn start(command: impl Command) -> Self {
-        println!("Start scheduled command");
-        let command = Rc::new(command);
+impl<T> Subsystem<T> {
+    pub fn new(data: T, idle_goal: Goal<T>) -> Self {
+        let data = Rc::new(RefCell::new(data));
         Self {
-            command: command.clone(),
-            task: Some(spawn(async move {
-                println!("Run scheduled command");
-                command.run().await;
-            })),
+            current_goal: Some(idle_goal.begin(data.clone())),
+            data,
+            idle_goal,
         }
     }
 
-    pub fn stop(self) {}
+    pub fn set_goal(&mut self, goal: Goal<T>) {
+        self.current_goal = None;
+        self.current_goal = Some(goal.begin(self.data.clone()));
+    }
+
+    pub fn while_pressed(&mut self, button: ButtonState, goal: Goal<T>) {
+        if button.is_now_pressed() {
+            self.set_goal(goal);
+        } else if button.is_now_released() {
+            self.set_goal(self.idle_goal.clone());
+        }
+    }
 }
 
-impl Drop for ScheduledCommand {
-    fn drop(&mut self) {
-        println!("End scheduled command");
-        if let Some(task) = self.task.take() {
-            let command = self.command.clone();
-            spawn(async move {
-                task.cancel().await;
-                command.end();
-            }).detach();
-        }
+pub struct Goal<T>(Rc<dyn Fn(Rc<RefCell<T>>) -> Pin<Box<dyn Future<Output = ()>>>>);
+
+impl<T> Clone for Goal<T> {
+    fn clone(&self) -> Self {
+        Goal(self.0.clone())
     }
+}
+
+impl<T> Goal<T> {
+    fn begin(&self, data: Rc<RefCell<T>>) -> Task<()> {
+        spawn((self.0)(data))
+    }
+}
+
+pub fn goal<T, G, F>(inner: G) -> Goal<T>
+where
+    G: Fn(Rc<RefCell<T>>) -> F + 'static,
+    F: Future<Output = ()> + 'static,
+{
+    Goal(Rc::new(move |s| Box::pin(inner(s))))
 }

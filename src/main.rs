@@ -5,7 +5,6 @@
 
 extern crate alloc;
 
-use alloc::rc::Rc;
 use core::time::Duration;
 
 use subsystems::{

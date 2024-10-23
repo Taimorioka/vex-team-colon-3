@@ -1,16 +1,7 @@
-use alloc::{boxed::Box, rc::Rc, sync::Arc};
-use core::{
-    cell::{Cell, RefCell, RefMut},
-    future::Future,
-    ops::Deref,
-    pin::{pin, Pin},
-};
+use alloc::{boxed::Box, rc::Rc};
+use core::{cell::RefCell, future::Future, pin::Pin};
 
-use snafu::Snafu;
-use vexide::{
-    devices::controller::{ButtonState, ControllerState},
-    prelude::*,
-};
+use vexide::{devices::controller::ButtonState, prelude::*};
 
 pub mod drivetrain;
 pub mod intake;

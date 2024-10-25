@@ -35,10 +35,16 @@ pub fn arcade(state: ControllerState) -> Goal<DifferentialDrivetrain> {
                 let left_voltage = (turn + forward) * Motor::V5_MAX_VOLTAGE;
                 let right_voltage = (turn - forward) * Motor::V5_MAX_VOLTAGE;
 
+                xyv::record_output("/Drivetrain/LeftVoltage", left_voltage);
+                xyv::record_output("/Drivetrain/RightVoltage", right_voltage);
+
                 // Set the drive motors to our arcade control values.
                 s.left.set_voltage(left_voltage).ok();
                 s.right.set_voltage(right_voltage).ok();
             } else {
+                xyv::record_output("/Drivetrain/LeftVoltage", 0.0);
+                xyv::record_output("/Drivetrain/RightVoltage", 0.0);
+
                 s.left.brake(BrakeMode::Brake).ok();
                 s.right.brake(BrakeMode::Brake).ok();
             }

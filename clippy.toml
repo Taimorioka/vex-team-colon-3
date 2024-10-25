@@ -1,0 +1,5 @@
+disallowed-macros = [
+    { path = "vexide_core::io::stdio::println", reason = "xyv requires control of the serial output" },
+    { path = "vexide_core::io::stdio::print", reason = "xyv requires control of the serial output" },
+    { path = "vexide_core::io::stdio::dbg", reason = "xyv requires control of the serial output" },
+]

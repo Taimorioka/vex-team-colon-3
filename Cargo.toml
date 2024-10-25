@@ -12,8 +12,11 @@ icon = "cool-x"
 compress = true
 
 [dependencies]
+log = "0.4.22"
+serde = { version = "1.0.213", default-features = false, features = ["derive"] }
 snafu = { version = "0.8.5", default-features = false, features = [
     "rust_1_81",
     "unstable-core-error",
 ] }
 vexide = { git = "https://github.com/vexide/vexide.git", version = "0.4.1" }
+xyv = { version = "0.1.0", path = "../xyv" }

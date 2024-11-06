@@ -37,9 +37,9 @@ impl Compete for Robot {
             self.drivetrain.set_goal(drivetrain::arcade(state));
 
             self.intake
-                .while_pressed(state.right_trigger_1, intake::intake(IntakeDirection::Intake));
+                .while_pressed(state.left_trigger_1, intake::intake(IntakeDirection::Intake));
             self.intake
-                .while_pressed(state.right_trigger_2, intake::intake(IntakeDirection::Outtake));
+                .while_pressed(state.right_trigger_1, intake::intake(IntakeDirection::Outtake));
 
             sleep(Duration::from_millis(10)).await;
         }

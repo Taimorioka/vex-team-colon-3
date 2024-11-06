@@ -53,8 +53,8 @@ async fn main(peripherals: Peripherals) {
     let robot = Robot {
         controller: peripherals.primary_controller,
         drivetrain: DifferentialDrivetrain::new(
-            Motor::new(peripherals.port_1, Gearset::Green, Direction::Forward),
-            Motor::new(peripherals.port_2, Gearset::Green, Direction::Forward),
+            Motor::new(peripherals.port_1, Gearset::Red, Direction::Forward),
+            Motor::new(peripherals.port_2, Gearset::Red, Direction::Forward),
         ), //intake
         intake: Intake::new(Motor::new(
             peripherals.port_3,
